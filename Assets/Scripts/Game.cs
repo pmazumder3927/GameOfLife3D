@@ -8,9 +8,9 @@ public class Game : MonoBehaviour
     private CellProperties[,,] nextBoard = new CellProperties[32, 32, 32];
     public GameObject cellPrefab;
     private int[,,] initialState = new int[32, 32, 32];
-    private int[,] cellView = new int[24, 3] { { 1, 1, 1 }, { 0, 1, 1 }, { -1, 1, 1 }, { -1, 0, 1 }, { -1, -1, 1 }, { 0, -1, 1 }, { 1, -1, 1 }, { 1, 0, 1 },
+    private int[,] cellView = new int[26, 3] { { 1, 1, 1 }, { 0, 1, 1 }, { -1, 1, 1 }, { -1, 0, 1 }, { -1, -1, 1 }, { 0, -1, 1 }, { 1, -1, 1 }, { 1, 0, 1 }, {0, 0, 1},
     { 1, 1, 0 }, { 0, 1, 0 }, { -1, 1, 0 }, { -1, 0, 0 }, { -1, -1, 0 }, { 0, -1, 0 }, { 1, -1, 0 }, { 1, 0, 0 },
-    { 1, 1, -1 }, { 0, 1, -1 }, { -1, 1, -1 }, { -1, 0, -1 }, { -1, -1, -1 }, { 0, -1, -1 }, { 1, -1, -1 }, { 1, 0, -1 }};
+    { 1, 1, -1 }, { 0, 1, -1 }, { -1, 1, -1 }, { -1, 0, -1 }, { -1, -1, -1 }, { 0, -1, -1 }, { 1, -1, -1 }, { 1, 0, -1 }, {0, 0, -1} };
     // Start is called before the first frame update
     void Start()
     {
@@ -62,59 +62,97 @@ public class Game : MonoBehaviour
             {
                 for (int k = 0; k < currTime.GetLength(2); ++k)
                 {
-                    int neighbors = checkNeighbors(i, j, k, cellView);
-                    CellProperties currCell = nextBoard[i, j, k];
-                    // any live cell with fewer than 6 neighbors dies
-                    if (currCell.alive && neighbors < 6)
+                    nextBoard[i, j, k] = currTime[i, j, k].GetProps();
+                    int neighbors = checkNeighbors(i, j, k);
+                    CellProperties currCell = currTime[i,j,k].GetProps();
+                    CellProperties nextCell = nextBoard[i, j, k];
+                    if (currCell.alive)
                     {
-                        currCell.alive = false;
+                        // any live cell with fewer than 6 neighbors dies
+                        if (neighbors < 6)
+                        {
+                            nextCell.alive = false;
+                        }
+                        // any live cell with more than 9 live neighbors dies
+                        if (neighbors > 9)
+                        {
+                            nextCell.alive = false;
+                        }
                     }
-                    // any live cell with more than 9 live neighbors dies
-                    if (currCell.alive && neighbors > 9)
+                    else
                     {
-                        currCell.alive = false;
+                        //any dead cell with 9 live neighbors comes back to life
+                        if (neighbors >= 9)
+                        {
+                            nextCell.alive = true;
+                        }
                     }
-                    //any dead cell with 9 live neighbors comes back to life
-                    if (!currCell.alive && neighbors == 9)
-                    {
-                        currCell.alive = true;
-                    }
-                    nextBoard[i, j, k].age += 1;
+                    nextCell.neighbors = neighbors;
+                    nextCell.age += 1;
                 }
             }
         }
         return nextBoard;
     }
-
-    public void NextStep()
+    
+    IEnumerator RenderNext()
     {
-        CellProperties[,,] nextBoard = GetNextBoard();
-        // update curr board
-        for (int i = 0; i < currTime.GetLength(0); ++i)
+        // This will wait 1 second like Invoke could do, remove this if you don't need it
+        yield return new WaitForSeconds(1);
+
+
+        float timePassed = 0;
+        while (timePassed < 100)
         {
-            for (int j = 0; j < currTime.GetLength(1); ++j)
+            CellProperties[,,] nextBoard = GetNextBoard();
+            // update curr board
+            for (int i = 0; i < currTime.GetLength(0); ++i)
             {
-                for (int k = 0; k < currTime.GetLength(2); ++k)
+                for (int j = 0; j < currTime.GetLength(1); ++j)
                 {
-                    currTime[i, j, k].SetProps(nextBoard[i, j, k]);
+                    for (int k = 0; k < currTime.GetLength(2); ++k)
+                    {
+                        currTime[i, j, k].SetProps(nextBoard[i, j, k]);
+                    }
                 }
             }
+            timePassed += Time.deltaTime;
+
+            yield return new WaitForSeconds(0.1f);
         }
     }
 
-    private int checkNeighbors(int x, int y, int z, int[,] view)
+    public void NextStep()
+    {
+        StartCoroutine(RenderNext());
+    }
+
+    public int checkNeighbors(int x, int y, int z)
     {
         int neighbors = 0;
-        for(int i=0; i < view.GetLength(0); i++)
+        for(int i=0; i < cellView.GetLength(0); i++)
         {
-            int xm = x + view[i, 0];
-            int ym = y + view[i, 1];
-            int zm = z + view[i, 2];
+            int xm = x + cellView[i, 0];
+            int ym = y + cellView[i, 1];
+            int zm = z + cellView[i, 2];
             if (xm > 0 && ym > 0 && zm > 0 && xm < 32 && ym < 32 && zm < 32)
             {
                 if (currTime[xm, ym, zm].GetProps().alive) neighbors++;
             }
         }
         return neighbors;
+    }
+
+    public void CreateAtCoordinate(Vector3 pos)
+    {
+        print(string.Format("Position hit: {0} {1} {2}", pos.x, pos.y, pos.z));
+        int x = Mathf.RoundToInt(pos.x);
+        int y = Mathf.RoundToInt(pos.y);
+        int z = Mathf.RoundToInt(pos.z);
+        print(x);
+        print(y);
+        print(z);
+        print(currTime[x, y, z].GetProps().alive);
+        currTime[x, y, z].SetProps(new CellProperties(true));
     }
 }

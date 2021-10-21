@@ -13,4 +13,5 @@ public class CellProperties {
     }
     public int age;
     public bool alive;
+    public int neighbors;
 }
